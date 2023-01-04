@@ -1,0 +1,5 @@
+/qpid-proton
+/qpid-proton-build
+/skupper-router
+/skupper-router-build
+__pycache__/
