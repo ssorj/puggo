@@ -21,9 +21,11 @@ def install_proton():
         "-DBUILD_GO=OFF",
         "-DBUILD_PYTHON=OFF",
         "-DBUILD_RUBY=OFF",
+        "-DENABLE_FUZZ_TESTING=OFF",
     ]
 
     cmake_options = " ".join(cmake_options)
+    profile_dir = make_temp_dir()
 
     remove("qpid-proton-build")
 
@@ -32,23 +34,46 @@ def install_proton():
         print("PROFILE GENERATE")
         print()
 
-        with working_env(CFLAGS="-fprofile-generate -Wno-error=missing-profile"):
+        with working_env(CFLAGS=f"-fprofile-dir={profile_dir} -fprofile-generate={profile_dir}",
+                         CXXFLAGS=f"-fprofile-dir={profile_dir} -fprofile-generate={profile_dir}"):
             run(f"cmake ../qpid-proton {cmake_options}")
 
         run(f"make -j {os.cpu_count()}")
 
-        # run("make install")
-        # with working_dir("/home/jross/code/queequeg"):
-        #     with working_env(LD_LIBRARY_PATH="/home/jross/.local/lib64"):
+        # # This one doesn't work
+        #
+        # with working_env(LD_LIBRARY_PATH="/home/jross/code/puggo/qpid-proton-build/c"):
+        #     with working_dir("/home/jross/code/queequeg"):
+        #         run("ldd queequeg")
         #         run("./plano record")
 
-        run("ctest -R '^c-' -E c-fdlimit-tests")
+        # # This one doesn't work
+        #
+        # run(f"make install")
+        #
+        # with working_env(LD_LIBRARY_PATH="/home/jross/.local/lib64"):
+        #     with working_dir("/home/jross/code/queequeg"):
+        #         run("./plano record")
+
+        # # This one *does* work
+        #
+        # run("ctest -R '^c-' -E c-fdlimit-tests")
+        # run("ctest -R c-example-tests --repeat until-fail:100")
+
+        with working_env(LD_LIBRARY_PATH="/home/jross/code/puggo/qpid-proton-build/c"):
+            run("quiver")
+
+        sleep(1)
+
+        if not list_dir(profile_dir):
+            fail("No profile")
 
         print()
         print("PROFILE USE")
         print()
 
-        with working_env(CFLAGS="-fprofile-use -fprofile-correction -Wno-error=missing-profile"):
+        with working_env(CFLAGS=f"-fprofile-dir={profile_dir} -fprofile-use={profile_dir} -fprofile-correction -Wno-error=missing-profile",
+                         CXXFLAGS=f"-fprofile-dir={profile_dir} -fprofile-use={profile_dir} -fprofile-correction -Wno-error=missing-profile"):
             run(f"cmake ../qpid-proton {cmake_options}")
 
         run(f"make -j {os.cpu_count()}")
@@ -66,6 +91,7 @@ def install_router():
     ]
 
     cmake_options = " ".join(cmake_options)
+    profile_dir = make_temp_dir()
 
     remove("skupper-router-build")
 
@@ -74,23 +100,34 @@ def install_router():
         print("PROFILE GENERATE")
         print()
 
-        with working_env(CFLAGS="-fprofile-generate -Wno-error=missing-profile -Wno-error=format-truncation"):
+        with working_env(CFLAGS=f"-fprofile-dir={profile_dir} -fprofile-generate={profile_dir}",
+                         CXXFLAGS=f"-fprofile-dir={profile_dir} -fprofile-generate={profile_dir}"):
             run(f"cmake ../skupper-router {cmake_options}")
 
         run(f"make -j {os.cpu_count()}")
 
         # run("make install")
+        #
         # with working_dir("/home/jross/code/flimflam"):
         #     with working_env(LD_LIBRARY_PATH="/home/jross/.local/lib64"):
         #         run("./plano skstat --buffer 16385")
+        #
+        # run("ctest -R '^unit_tests$' --repeat until-fail:10")
 
-        run("ctest -R '^unit_tests$'")
+        with start("router/skrouterd"):
+            run("quiver jobs")
+
+        sleep(1)
+
+        if not list_dir(profile_dir):
+            fail("No profile")
 
         print()
         print("PROFILE USE")
         print()
 
-        with working_env(CFLAGS="-fprofile-use -fprofile-correction -Wno-error=missing-profile -Wno-error=format-truncation"):
+        with working_env(CFLAGS=f"-fprofile-dir={profile_dir} -fprofile-use={profile_dir} -fprofile-correction -Wno-error=missing-profile -Wno-error=format-truncation",
+                         CXXFLAGS=f"-fprofile-dir={profile_dir} -fprofile-use={profile_dir} -fprofile-correction -Wno-error=missing-profile -Wno-error=format-truncation"):
             run(f"cmake ../skupper-router {cmake_options}")
 
         run(f"make -j {os.cpu_count()}")
